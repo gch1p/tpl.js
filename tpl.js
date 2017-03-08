@@ -1,6 +1,6 @@
 (function(window) {
 
-var NATIVE_PROXY = !('Proxy' in window);
+var NATIVE_PROXY = ('Proxy' in window);
 
 function proxifyObject(obj) {
   if (NATIVE_PROXY) {
