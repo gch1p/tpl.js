@@ -22,7 +22,7 @@ You can also ask `tpl` function to return HTML markup by providing `asHTML` opti
 var html = tpl(myTemplate, { /* your data */ }, { asHTML: true });
 ```
 
-All input is transparently escaped by default, but you can access original unescaped object in templates this way:
+All input is transparently escaped by default (as you access it), but you can access original object in templates this way:
 
 ```
 function myTemplate(data) {
