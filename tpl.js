@@ -1,51 +1,75 @@
 (function(window) {
 
-function tpl(f, vars, opts) {
-  opts = opts || {};
+var NATIVE_PROXY = !('Proxy' in window);
 
-  var html = f.call(f, new ObjectProxy(vars));
-  if (opts.asHTML) {
-    return html;
+function proxifyObject(obj) {
+  if (NATIVE_PROXY) {
+    var p = new Proxy(obj, {
+      get: function(target, prop, receiver) {
+        if (prop === '__target') {
+          return target;
+        }
+        return getter(target, prop);
+      }
+    });
+    p.__target = obj;
+    p.__isProxy = true;
+    return p;
+  } else {
+    return new ObjectProxy(obj);
   }
-
-  var div = document.createElement('div');
-  var frag = document.createDocumentFragment();
-
-  div.innerHTML = html;
-  for (var i = 0; i < div.children.length; i++) {
-    frag.appendChild(div.children[i]);
-  }
-  return frag;
 }
 
-function ObjectProxy(obj) {
-  for (var prop in obj) {
-    if (obj.hasOwnProperty(prop)) {
-      Object.defineProperty(this, prop, {
-        get: this.__get.bind(this, prop)
-      })
-    }
-  }
-  this.target = obj;
-}
-ObjectProxy.prototype.__get = function(prop, raw) {
-  if (!(prop in this.target)) {
-    return undefined
+function getter(target, prop) {
+  if (!(prop in target)) {
+    return undefined;
   }
 
-  var value = this.target[prop];
-  if (raw) {
-    return value;
+  var value = target[prop];
+  if (typeof(value) == 'object') {
+    return proxifyObject(value);
   }
-  if (typeof value == 'object') {
-    return new ObjectProxy(value);
-  }
-  if (typeof value == 'string') {
+  if (typeof(value) == 'string') {
     return htmlescape(value);
   }
   return value;
-};
+}
 
+//
+// Emulate Proxy in old browsers
+//
+if (!NATIVE_PROXY) {
+  function ObjectProxy(obj) {
+    if (Object.prototype.toString.call(obj) === '[object Array]') {
+      this.length = obj.length;
+      for (var i = 0; i < obj.length; i++) {
+        Object.defineProperty(this, i, {
+          get: this.__get.bind(this, i)
+        })
+      }
+    } else if (typeof(obj) == 'object') {
+      for (var prop in obj) {
+        if (obj.hasOwnProperty(prop)) {
+          Object.defineProperty(this, prop, {
+            get: this.__get.bind(this, prop)
+          })
+        }
+      }
+    }
+    this.__target = obj;
+    this.__isProxy = true;
+  }
+  ObjectProxy.prototype.__get = function(prop) {
+    return getter(this.__target, prop);
+  };
+  ObjectProxy.prototype.valueOf = function() {
+    return this.__target;
+  };
+}
+
+//
+// HTML escaping
+//
 var HTML_ENTITY_MAP = {
   '&': '&amp;',
   '<': '&lt;',
@@ -62,6 +86,25 @@ function htmlescape(string) {
   });
 }
 
-window.tpl = tpl;
+//
+// Main function
+//
+window.tpl = function tpl(f, vars, opts) {
+  opts = opts || {};
+
+  var html = f.call(f, !vars.__isProxy ? proxifyObject(vars) : vars);
+  if (opts.asHTML) {
+    return html;
+  }
+
+  var div = document.createElement('div');
+  var frag = document.createDocumentFragment();
+
+  div.innerHTML = html;
+  for (var i = 0; i < div.children.length; i++) {
+    frag.appendChild(div.children[i]);
+  }
+  return frag;
+};
 
 })(window);
