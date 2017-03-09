@@ -3,6 +3,9 @@
 var NATIVE_PROXY = ('Proxy' in window);
 
 function proxifyObject(obj) {
+  if (obj.__isProxy) {
+    return obj
+  }
   if (NATIVE_PROXY) {
     var p = new Proxy(obj, {
       get: function(target, prop, receiver) {
@@ -92,7 +95,7 @@ function htmlescape(string) {
 window.tpl = function tpl(f, vars, opts) {
   opts = opts || {};
 
-  var html = f.call(f, !vars.__isProxy ? proxifyObject(vars) : vars);
+  var html = f.call(f, proxifyObject(vars));
   if (opts.asHTML) {
     return html;
   }
